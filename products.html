@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW">
+
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>第四週 - 元件化</title>
+  <!-- Bootstrap CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.2/dist/css/bootstrap.min.css" rel="stylesheet"
+    integrity="sha384-Zenh87qX5JnK2Jl0vWa8Ck2rdkQ2Bzep5IDxbcnCeuOxjzrPF/et3URy9Bv1WTRi" crossorigin="anonymous">
+</head>
+
+<body>
+  <div id="app">
+    <div class="container">
+      <div class="text-end mt-4">
+        <button class="btn btn-primary" @click="openModal('new')">
+          建立新的產品
+        </button>
+      </div>
+      <table class="table mt-4">
+        <thead>
+          <tr>
+            <th width="120">
+              分類
+            </th>
+            <th>產品名稱</th>
+            <th width="120">
+              原價
+            </th>
+            <th width="120">
+              售價
+            </th>
+            <th width="100">
+              是否啟用
+            </th>
+            <th width="120">
+              編輯或刪除
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          <!-- 列表渲染 products 資料於 tr 表格中 -->
+          <tr v-for="(item) in products" :key="item.id">
+            <td>{{ item.category }}</td>
+            <td>{{ item.title }}</td>
+            <td>
+              {{ item.origin_price }}
+            </td>
+            <td>
+              {{ item.price }}
+            </td>
+            <td>
+              <!-- 若物件為啟用 -->
+              <span v-if="item.is_enabled" class="text-success">啟用</span>
+              <!-- 若物件未啟用 -->
+              <span v-else>未啟用</span>
+            </td>
+            <td>
+              <div class="btn-group">
+                <!-- v-on 點擊後傳入所點 products 中的物件內容進 tempProduct 暫存資料物件  -->
+                <button type="button" class="btn btn-outline-primary btn-sm" @click="openModal('edit', item)">
+                  編輯
+                </button>
+                <!-- v-on 點擊後刪除所點 products 中的物件  -->
+                <button type="button" class="btn btn-outline-danger btn-sm" @click="openModal('delete', item)">
+                  刪除
+                </button>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <!-- pagination 分頁元件 props 傳入 pagination 值進元件且定義 emitPages emit 觸發 getData 事件 -->
+      <pagination :pages="pagination" @emit-pages="getData"></pagination>
+    </div>
+    <!-- product 產品 Modal 元件 props 傳入 tempProduct, isNew 值進元件且定義 update emit 觸發 getData 事件 -->
+    <product-modal ref="product" :product="tempProduct" :is-new="isNew" @update="getData"></product-modal>
+    <!-- deleteProduct 刪除產品 Modal 元件 props 傳入 tempProduct 值進元件且定義 update emit 觸發 getData 事件 -->
+    <delete-product-modal ref="deleteProduct" :item="tempProduct" @update="getData"></delete-product-modal>
+  </div>
+
+  <script type="text/x-template" id="pagination">
+      <nav aria-label="Page navigation example">
+        <ul class="pagination">
+          <!-- 若 pages.current_page 值等於 1 加上 disabled class -->
+          <li
+            class="page-item"
+            :class="{'disabled': pages.current_page === 1}"
+          >
+            <!-- v-on emit 觸發 getData 事件並套用 prevent 避免瀏覽器預設行為修飾符 -->
+            <a
+              class="page-link"
+              href="#"
+              aria-label="Previous"
+              @click.prevent="emitPages(pages.current_page - 1)"
+            >
+              <span aria-hidden="true">&laquo;</span>
+            </a>
+          </li>
+          <!-- 列表渲染 pages.total_pages 資料於 li 列表中 -->
+          <!-- 若 pages.current_page 值等於 item 值加上 active class -->
+          <li
+            v-for="(item, index) in pages.total_pages"
+            :key="index"
+            class="page-item"
+            :class="{'active': item === pages.current_page}"
+          >
+            <!-- 若 item 等於 pages.current_page 值則顯示 -->
+            <span
+              class="page-link"
+              v-if="item === pages.current_page"
+            >{{ item }}</span>
+            <!-- v-on emit 觸發 getData 事件並套用 prevent 避免瀏覽器預設行為修飾符 -->
+            <a
+              class="page-link"
+              href="#"
+              v-else
+              @click.prevent="emitPages(item)"
+            >{{ item }}</a>
+          </li>
+          <!-- 若 pages.current_page 值等於 pages.total_pages 值加上 disabled class -->
+          <li
+            class="page-item"
+            :class="{'disabled': pages.current_page === pages.total_pages}"
+          >
+          <!-- v-on emit 觸發 getData 事件並套用 prevent 避免瀏覽器預設行為修飾符 -->
+            <a
+              class="page-link"
+              href="#"
+              aria-label="Next"
+              @click.prevent="emitPages(pages.current_page + 1)"
+            >
+              <span aria-hidden="true">&raquo;</span>
+            </a>
+          </li>
+        </ul>
+      </nav>
+    </script>
+
+  <script type="text/x-template" id="productModal">
+      <div id="productModal" ref="modal" class="modal fade" tabindex="-1" aria-labelledby="productModalLabel"
+        aria-hidden="true">
+        <div class="modal-dialog modal-xl">
+          <div class="modal-content border-0">
+            <div class="modal-header bg-dark text-white">
+              <h5 id="productModalLabel" class="modal-title">
+                <!-- 若為新產品則 Modal 標籤為新增產品 -->
+                <span v-if="isNew">新增產品</span>
+                <!-- 若為既有產品則 Modal 標籤為編輯產品 -->
+                <span v-else>編輯產品</span>
+              </h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <div class="row mb-3">
+                <div class="col-sm-4">
+                  <div class="form-group mb-3">
+                    <label for="imageUrl" class="form-label">主要圖片</label>
+                    <!-- 雙向綁定此輸入區塊內的輸入內容進 product 中的 imageUrl -->
+                    <input v-model="product.imageUrl" type="text" class="form-control" placeholder="請輸入圖片連結">
+                    <!-- v-bind 顯示 prouct 中的 imageUrl 圖片 -->
+                    <img class="img-fluid" :src="product.imageUrl">
+                  </div>
+                  <!-- product.imagesUrl 矩陣若有值則顯示 -->
+                  <div v-if="Array.isArray(product.imagesUrl)">
+                    <div class="mb-1" v-for="(image, key) in product.imagesUrl" :key="key">
+                      <div class="form-group">
+                        <label for="imageUrl" class="form-label">圖片網址</label>
+                        <!-- 雙向綁定此輸入區塊內的輸入內容進 product 中的 imagesUrl 與對應 key 值 -->
+                        <input v-model="product.imagesUrl[key]" type="text" class="form-control"
+                          placeholder="請輸入圖片連結">
+                      </div>
+                      <img class="img-fluid" :src="image">
+                    </div>
+                    <!-- 若 product.imagesUrl 矩陣有值則顯示新增圖片按鈕 -->
+                    <div
+                      v-if="!product.imagesUrl.length || product.imagesUrl[product.imagesUrl.length - 1]">
+                      <!-- v-on 觸發後將上傳新產品圖片資料儲存進 product 暫存資料中的 imagesUrl -->
+                      <button class="btn btn-outline-primary btn-sm d-block w-100"
+                        @click="product.imagesUrl.push('')">
+                        新增圖片
+                      </button>
+                    </div>
+                    <!-- 若 product.imagesUrl 矩陣無值則顯示刪除圖片按鈕 -->
+                    <div v-else>
+                      <!-- v-on 觸發後將所點選產品圖片資料自 product 暫存資料中的 imagesUrl 矩陣中刪除 -->
+                      <button class="btn btn-outline-danger btn-sm d-block w-100" @click="product.imagesUrl.pop()">
+                        刪除圖片
+                      </button>
+                    </div>
+                  </div>
+                  <div v-else>
+                    <!-- v-on 觸發後 trigger createImages 顯示空的 product 暫存資料以供輸入儲存 -->
+                    <button class="btn btn-outline-primary btn-sm d-block w-100"
+                      @click="createImages">
+                      新增圖片
+                    </button>
+                  </div>
+                </div>
+                <div class="col-sm-8">
+                  <div class="form-group mb-3">
+                    <label for="title" class="form-label">標題</label>
+                    <!-- 雙向綁定此輸入區塊內的輸入內容進 tempProduct 中的 title -->
+                    <input id="title" v-model="product.title" type="text" class="form-control" placeholder="請輸入標題">
+                  </div>
+
+                  <div class="row mb-3">
+                    <div class="form-group col-md-6">
+                      <label for="category" class="form-label">分類</label>
+                      <!-- 雙向綁定此輸入區塊內的輸入內容進 tempProduct 中的 category -->
+                      <input id="category" v-model="product.category" type="text" class="form-control"
+                        placeholder="請輸入分類">
+                    </div>
+                    <div class="form-group col-md-6">
+                      <label for="price" class="form-label">單位</label>
+                      <!-- 雙向綁定此輸入區塊內的輸入內容進 tempProduct 中的 unit -->
+                      <input id="unit" v-model="product.unit" type="text" class="form-control" placeholder="請輸入單位">
+                    </div>
+                  </div>
+
+                  <div class="row mb-3">
+                    <div class="form-group col-md-6">
+                      <label for="origin_price" class="form-label">原價</label>
+                      <!-- 雙向綁定此輸入區塊內的輸入內容進 tempProduct 中的 origin_price -->
+                      <input id="origin_price" v-model.number="product.origin_price" type="number" min="0" class="form-control" placeholder="請輸入原價">
+                    </div>
+                    <div class="form-group col-md-6">
+                      <label for="price" class="form-label">售價</label>
+                      <!-- 雙向綁定此輸入區塊內的輸入內容進 tempProduct 中的 price -->
+                      <input id="price" v-model.number="product.price" type="number" min="0" class="form-control"
+                        placeholder="請輸入售價">
+                    </div>
+                  </div>
+                  <hr>
+
+                  <div class="form-group mb-3">
+                    <label for="description" class="form-label">產品描述</label>
+                    <!-- 雙向綁定此輸入區塊內的輸入內容進 tempProduct 中的 description -->
+                    <textarea id="description" v-model="product.description" type="text" class="form-control"
+                      placeholder="請輸入產品描述">
+                    </textarea>
+                  </div>
+                  <div class="form-group mb-3">
+                    <label for="content" class="form-label">說明內容</label>
+                    <!-- 雙向綁定此輸入區塊內的輸入內容進 tempProduct 中的 content -->
+                    <textarea id="description" v-model="product.content" type="text" class="form-control"
+                      placeholder="請輸入說明內容">
+                    </textarea>
+                  </div>
+                  <div class="form-group mb-3">
+                    <div class="form-check">
+                      <!-- 雙向綁定此輸入區塊內的輸入內容進 tempProduct 中的 is_enabled -->
+                      <input id="is_enabled" v-model="product.is_enabled" class="form-check-input" type="checkbox"
+                        :true-value="1" :false-value="0">
+                      <label class="form-check-label" for="is_enabled">是否啟用</label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                取消
+              </button>
+              <!-- v-on 觸發後 trigger updateProduct 並回傳結果訊息 -->
+              <button type="button" class="btn btn-primary" @click="updateProduct">
+                確認
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </script>
+
+  <script type="text/x-template" id="deleteProductModal">
+      <div id="deleteProductModal" ref="modal" class="modal fade" tabindex="-1" aria-labelledby="deleteProductModalLabel"
+        aria-hidden="true">
+        <div class="modal-dialog">
+          <div class="modal-content border-0">
+            <div class="modal-header bg-danger text-white">
+              <h5 id="deleteProductModalLabel" class="modal-title">
+                <span>刪除產品</span>
+              </h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              是否刪除
+              <!-- 顯示存於 tempProduct 中的產品 title -->
+              <strong class="text-danger">{{ item.title }}</strong> 商品(刪除後將無法恢復)。
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                取消
+              </button>
+              <!-- v-on 觸發後 trigger deleteProduct 並回傳結果訊息 --> 
+              <button type="button" class="btn btn-danger" @click="deleteProduct">
+                確認刪除
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </script>
+
+  <script src="https://cdn.jsdelivr.net/npm/axios@1.1.2/dist/axios.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.2/dist/js/bootstrap.bundle.min.js"
+    integrity="sha384-OERcA2EqjJCMA+/3y+gxIOqMEjwtxJY7qPCqsdltbNJuaOe923+mo//f6V8Qbsw3"
+    crossorigin="anonymous"></script>
+  <script src="./products.js" type="module"></script>
+</body>
+
+</html>
